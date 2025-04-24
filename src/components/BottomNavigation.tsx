@@ -1,6 +1,6 @@
 
 import { Link, useLocation } from "react-router-dom";
-import { Wallet, QrCode, BarcodeScan, Settings } from "lucide-react";
+import { Wallet, QrCode, Barcode, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const BottomNavigation = () => {
@@ -19,7 +19,7 @@ const BottomNavigation = () => {
     },
     {
       label: "Scan",
-      icon: <BarcodeScan className="h-6 w-6" />,
+      icon: <Barcode className="h-6 w-6" />,
       path: "/scan",
     },
     {
