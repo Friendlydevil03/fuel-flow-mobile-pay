@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import AppLayout from "@/components/AppLayout";
 import { useFuel } from "@/context/FuelContext";
@@ -7,8 +6,17 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 type ScanState = "ready" | "scanning" | "result";
+
+interface QrCodeData {
+  id: string;
+  code_value: string;
+  user_id: string;
+  code_type: string;
+  description?: string;
+}
 
 const ScannerPage = () => {
   const { processPayment } = useFuel();
@@ -17,42 +25,116 @@ const ScannerPage = () => {
   const [paymentAmount, setPaymentAmount] = useState("0.00");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const handleScan = () => {
-    // In a real app, this would use a camera API to scan a QR code
-    // For demo purposes, we'll simulate finding a QR code after a delay
+  const handleScan = async () => {
     setScanState("scanning");
     
-    setTimeout(() => {
-      // Mock scan result
-      const mockScanData = {
-        userId: "user123",
-        name: "John Doe",
-        fuelType: "Petrol",
-        balance: 50.00,
-        timestamp: new Date().toISOString()
-      };
-      
-      setScanData(mockScanData);
-      setScanState("result");
-      toast("QR Code Detected", { description: "Customer wallet found" });
-    }, 2000);
+    try {
+      // In a real app, this would use a camera API to scan a QR code
+      // For demo purposes, we'll simulate finding a QR code after a delay
+      setTimeout(async () => {
+        // Simulate scanning a QR code and getting its value
+        const mockQrValue = "test-qr-code-123";
+        
+        // Query the database for the QR code information
+        const { data: qrData, error } = await supabase
+          .from('qr_codes')
+          .select('*')
+          .eq('code_value', mockQrValue)
+          .single();
+
+        if (error) {
+          toast.error("Error reading QR code");
+          setScanState("ready");
+          return;
+        }
+
+        if (!qrData) {
+          toast.error("Invalid QR code");
+          setScanState("ready");
+          return;
+        }
+
+        // Get wallet information for the QR code's user
+        const { data: walletData, error: walletError } = await supabase
+          .from('wallets')
+          .select('*')
+          .eq('user_id', qrData.user_id)
+          .single();
+
+        if (walletError) {
+          toast.error("Error retrieving wallet information");
+          setScanState("ready");
+          return;
+        }
+
+        const userData = {
+          userId: qrData.user_id,
+          name: "Customer", // In a real app, you'd get this from a users/profiles table
+          fuelType: qrData.code_type,
+          balance: walletData.balance,
+          timestamp: new Date().toISOString()
+        };
+        
+        setScanData(userData);
+        setScanState("result");
+        toast.success("QR Code Detected", { description: "Customer wallet found" });
+      }, 2000);
+    } catch (error) {
+      console.error('Scan error:', error);
+      toast.error("Error scanning QR code");
+      setScanState("ready");
+    }
   };
 
-  const handlePayment = () => {
+  const handlePayment = async () => {
     const amount = parseFloat(paymentAmount);
     if (isNaN(amount) || amount <= 0) {
-      toast("Invalid Amount", { description: "Please enter a valid amount" });
+      toast.error("Invalid Amount", { description: "Please enter a valid amount" });
       return;
     }
 
-    if (processPayment(amount)) {
-      setIsDialogOpen(false);
-      toast.success("Payment Processed", { 
-        description: `$${amount.toFixed(2)} has been deducted from the customer's wallet.` 
-      });
-      // Reset the scanner after payment
-      setScanState("ready");
-      setScanData(null);
+    try {
+      // Create a new transaction record
+      const { error: transactionError } = await supabase
+        .from('transactions')
+        .insert({
+          user_id: scanData.userId,
+          amount: amount,
+          transaction_type: 'payment',
+          qr_code_id: scanData.qrCodeId,
+          status: 'completed'
+        });
+
+      if (transactionError) {
+        toast.error("Transaction failed");
+        return;
+      }
+
+      // Update wallet balance
+      const { error: walletError } = await supabase
+        .from('wallets')
+        .update({ 
+          balance: scanData.balance - amount,
+          last_updated: new Date().toISOString()
+        })
+        .eq('user_id', scanData.userId);
+
+      if (walletError) {
+        toast.error("Failed to update wallet");
+        return;
+      }
+
+      if (processPayment(amount)) {
+        setIsDialogOpen(false);
+        toast.success("Payment Processed", { 
+          description: `$${amount.toFixed(2)} has been deducted from the customer's wallet.` 
+        });
+        setScanState("ready");
+        setScanData(null);
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      toast.error("Payment failed");
     }
   };
 
@@ -95,8 +177,8 @@ const ScannerPage = () => {
             
             <div className="space-y-3 mb-6">
               <div className="flex justify-between">
-                <span className="text-gray-500">Name:</span>
-                <span className="font-medium">{scanData.name}</span>
+                <span className="text-gray-500">Customer ID:</span>
+                <span className="font-medium">{scanData.userId}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Preferred Fuel:</span>
@@ -117,7 +199,7 @@ const ScannerPage = () => {
               </Button>
               <Button 
                 variant="outline" 
-                onClick={resetScan}
+                onClick={() => setScanState("ready")}
                 className="w-full"
               >
                 Cancel
@@ -126,7 +208,6 @@ const ScannerPage = () => {
           </Card>
         )}
 
-        {/* Payment Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
