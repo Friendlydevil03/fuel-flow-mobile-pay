@@ -2,11 +2,13 @@
 import { Link, useLocation } from "react-router-dom";
 import { Wallet, QrCode, Barcode, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
 
 const BottomNavigation = () => {
   const location = useLocation();
-  
-  const navItems = [
+  const { role } = useAuth();
+
+  const clientNavItems = [
     {
       label: "Wallet",
       icon: <Wallet className="h-6 w-6" />,
@@ -18,6 +20,14 @@ const BottomNavigation = () => {
       path: "/pay",
     },
     {
+      label: "Profile",
+      icon: <Settings className="h-6 w-6" />,
+      path: "/profile",
+    },
+  ];
+
+  const providerNavItems = [
+    {
       label: "Scan",
       icon: <Barcode className="h-6 w-6" />,
       path: "/scan",
@@ -28,6 +38,8 @@ const BottomNavigation = () => {
       path: "/profile",
     },
   ];
+
+  const navItems = role === 'provider' ? providerNavItems : clientNavItems;
 
   return (
     <div className="fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-gray-200 flex justify-around items-center px-4 z-10">
