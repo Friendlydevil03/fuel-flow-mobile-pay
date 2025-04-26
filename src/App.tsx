@@ -10,6 +10,7 @@ import WalletPage from "./pages/WalletPage";
 import PayPage from "./pages/PayPage";
 import ScannerPage from "./pages/ScannerPage";
 import ProfilePage from "./pages/ProfilePage";
+import AuthPage from "./pages/AuthPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,6 +24,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<WelcomePage />} />
+            <Route path="/auth" element={<AuthPage />} />
             <Route path="/wallet" element={<WalletPage />} />
             <Route path="/pay" element={<PayPage />} />
             <Route path="/scan" element={<ScannerPage />} />
